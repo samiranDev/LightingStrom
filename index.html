@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#4F46E5" media="(prefers-color-scheme:light)">
+<meta name="theme-color" content="#0C0B16" media="(prefers-color-scheme:dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="LS Backtest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Lightning Storm Leaf strategy backtesting dashboard">
+<title>Lightning Storm Backtest</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#F5F5FA;--surf:#FFFFFF;--surf2:#EDEDF6;--surf3:#F9F9FD;
+  --bord:#DDDDF0;--bord2:#E8E8F4;
+  --fg:#0D0C1D;--fg2:#44426A;--fg3:#9694B8;
+  --acc:#4F46E5;--acc2:#6366F1;--acc-dim:#EEF2FF;--acc-fg:#FFFFFF;
+  --pos:#059669;--pos-bg:#ECFDF5;--pos-dim:#A7F3D0;
+  --neg:#DC2626;--neg-bg:#FEF2F2;--neg-dim:#FECACA;
+  --sig:#2563EB;--sig-bg:#EFF6FF;
+  --warn-fg:#B45309;--warn-bg:#FFFBEB;--warn-dim:#FDE68A;
+  --neu-bg:#F3F4F6;--neu-fg:#6B7280;
+  --sh:0 1px 3px rgba(79,70,229,.06),0 2px 10px rgba(0,0,0,.05);
+  --sh2:0 4px 20px rgba(79,70,229,.12),0 1px 4px rgba(0,0,0,.07);
+  --r:12px;--rsm:8px;--rxs:5px;
+  --hdr-h:56px;
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-l:env(safe-area-inset-left,0px);
+  --safe-r:env(safe-area-inset-right,0px);
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#0C0B16;--surf:#131221;--surf2:#1B1A2E;--surf3:#100F1C;
+  --bord:#2C2A48;--bord2:#23213A;
+  --fg:#E6E4F8;--fg2:#9896C8;--fg3:#5856A0;
+  --acc:#818CF8;--acc2:#6366F1;--acc-dim:#1E1B4B;--acc-fg:#0D0C1D;
+  --pos:#34D399;--pos-bg:#032218;--pos-dim:#065F46;
+  --neg:#F87171;--neg-bg:#2D0A0A;--neg-dim:#7F1D1D;
+  --sig:#60A5FA;--sig-bg:#0A1628;
+  --warn-fg:#FBBF24;--warn-bg:#1C1100;--warn-dim:#78350F;
+  --neu-bg:#1F1D32;--neu-fg:#9CA3AF;
+  color-scheme:dark;
+}}
+:root[data-theme=dark]{
+  --bg:#0C0B16;--surf:#131221;--surf2:#1B1A2E;--surf3:#100F1C;
+  --bord:#2C2A48;--bord2:#23213A;
+  --fg:#E6E4F8;--fg2:#9896C8;--fg3:#5856A0;
+  --acc:#818CF8;--acc2:#6366F1;--acc-dim:#1E1B4B;--acc-fg:#0D0C1D;
+  --pos:#34D399;--pos-bg:#032218;--pos-dim:#065F46;
+  --neg:#F87171;--neg-bg:#2D0A0A;--neg-dim:#7F1D1D;
+  --sig:#60A5FA;--sig-bg:#0A1628;
+  --warn-fg:#FBBF24;--warn-bg:#1C1100;--warn-dim:#78350F;
+  --neu-bg:#1F1D32;--neu-fg:#9CA3AF;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font-family:'Plus Jakarta Sans',system-ui,sans-serif;font-size:14px;line-height:1.5;padding-bottom:calc(80px + var(--safe-b))}
+button,input,select{font-family:inherit;touch-action:manipulation}
+button{cursor:pointer}
+/* ── HEADER ── */
+.hdr{background:linear-gradient(135deg,#3730A3 0%,#4F46E5 50%,#6366F1 100%);color:#fff;position:sticky;top:0;z-index:50;box-shadow:0 2px 16px rgba(79,70,229,.35)}
+.hdr::before{content:'';position:fixed;inset:0 0 auto;height:var(--safe-t);background:inherit;z-index:51}
+.hdr-in{display:flex;align-items:center;justify-content:space-between;padding:10px max(16px,var(--safe-r)) 10px max(16px,var(--safe-l));height:var(--hdr-h);gap:10px}
+.brand{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.brand-ic{width:36px;height:36px;background:rgba(255,255,255,.18);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0;letter-spacing:-.5px;backdrop-filter:blur(4px)}
+.brand-txt{min-width:0}
+.brand-txt h1{font-size:15px;font-weight:800;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand-txt p{font-size:10px;opacity:.7;line-height:1;white-space:nowrap}
+.hdr-acts{display:flex;gap:6px;align-items:center;flex-shrink:0}
+.btn-ghost{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.22);color:#fff;padding:6px 11px;border-radius:var(--rsm);font-size:12px;font-weight:700;transition:background .15s}
+.btn-ghost:hover,.btn-ghost:active{background:rgba(255,255,255,.28)}
+/* ── INSTALL BANNER ── */
+.ibanner{background:linear-gradient(135deg,var(--acc-dim),var(--pos-dim));border-bottom:1px solid var(--bord2);padding:10px max(16px,var(--safe-r)) 10px max(16px,var(--safe-l));display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ibanner-txt{font-size:12px;font-weight:600;color:var(--fg);flex:1;min-width:0}
+.ibanner-txt span{color:var(--acc);font-weight:700}
+.ibanner-acts{display:flex;gap:8px;align-items:center;flex-shrink:0}
+.ibanner-close{background:transparent;border:none;color:var(--fg3);font-size:18px;padding:2px 6px;line-height:1}
+/* ── DATA STRIP ── */
+.dstrip{background:var(--surf);border-bottom:1px solid var(--bord);padding:8px max(16px,var(--safe-r)) 8px max(16px,var(--safe-l))}
+.dstrip-in{display:flex;align-items:center;flex-wrap:wrap;gap:8px;justify-content:space-between}
+.dmeta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--fg2)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--fg3);flex-shrink:0;display:inline-block;transition:background .3s}
+.dot.ok{background:var(--pos)}.dot.err{background:var(--neg)}.dot.busy{background:var(--warn-fg);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.dbtns{display:flex;gap:6px;flex-wrap:wrap}
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 14px;border-radius:var(--rsm);font-size:12px;font-weight:700;border:none;white-space:nowrap;transition:opacity .15s,transform .08s;-webkit-user-select:none;user-select:none}
+.btn:active{transform:scale(.96)}
+.btn:disabled{opacity:.4;pointer-events:none}
+.btn-pri{background:var(--acc);color:var(--acc-fg)}
+.btn-sec{background:var(--surf2);color:var(--fg);border:1px solid var(--bord)}
+.btn-del{background:var(--neg-bg);color:var(--neg);border:1px solid var(--neg-dim)}
+.btn-sm{padding:6px 11px;font-size:11px}
+.btn-xs{padding:4px 8px;font-size:10px}
+/* ── MAIN LAYOUT ── */
+.main{padding:14px max(16px,var(--safe-r)) 20px max(16px,var(--safe-l));display:flex;flex-direction:column;gap:14px}
+/* ── ALERTS ── */
+.alert{padding:11px 14px;border-radius:var(--rsm);font-size:12px;line-height:1.7;border:1px solid;display:flex;align-items:flex-start;gap:8px}
+.alert-ic{flex-shrink:0;font-size:14px;margin-top:1px}
+.alert-info{background:var(--sig-bg);color:var(--sig);border-color:var(--sig)}
+.alert-err{background:var(--neg-bg);color:var(--neg);border-color:var(--neg-dim)}
+.alert-warn{background:var(--warn-bg);color:var(--warn-fg);border-color:var(--warn-dim)}
+/* ── CARDS ── */
+.card{background:var(--surf);border:1px solid var(--bord);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.ch{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--bord2);flex-wrap:wrap;gap:8px}
+.ch h3{font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px}
+.ch-sub{font-size:11px;font-weight:400;color:var(--fg3)}
+.cb{padding:16px}
+/* ── SETTINGS ── */
+.sec-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--fg3);padding:12px 16px 0}
+.ctrls{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;padding:14px 16px 12px}
+.cg label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--fg3);margin-bottom:5px}
+.ci,.cs{width:100%;padding:9px 11px;border:1.5px solid var(--bord);border-radius:var(--rsm);background:var(--bg);color:var(--fg);font-size:13px;font-weight:500;transition:border-color .15s,box-shadow .15s}
+.ci:focus,.cs:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-dim)}
+.pnote{font-size:11px;color:var(--fg3);padding:0 16px 13px;font-style:italic;line-height:1.6}
+/* ── STATS GRID ── */
+.sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 16px}
+@media(max-width:800px){.sgrid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:540px){.sgrid{grid-template-columns:repeat(2,1fr)}}
+.sc{background:var(--surf3);border:1px solid var(--bord2);border-radius:10px;padding:13px 14px;position:relative;overflow:hidden;transition:box-shadow .15s}
+.sc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc);border-radius:3px 0 0 3px;opacity:.3}
+.sc.pos::before{background:var(--pos);opacity:.7}
+.sc.neg::before{background:var(--neg);opacity:.7}
+.sc.warn::before{background:var(--warn-fg);opacity:.7}
+.sl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--fg3);margin-bottom:4px}
+.sv{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;color:var(--fg)}
+.sv.pos{color:var(--pos)}.sv.neg{color:var(--neg)}.sv.warn{color:var(--warn-fg)}
+.ssub{font-size:10px;color:var(--fg3);margin-top:3px;font-weight:500}
+/* ── CHARTS ── */
+.crow{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+@media(max-width:680px){.crow{grid-template-columns:1fr}}
+.cwrap{padding:14px 16px}
+.cwrap h3{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--fg3);margin-bottom:10px}
+.ccanvas{position:relative;height:200px}
+/* ── TIME ANALYSIS ── */
+.tana-wrap{display:grid;grid-template-columns:260px 1fr}
+@media(max-width:720px){.tana-wrap{grid-template-columns:1fr}}
+.tana-left{border-right:1px solid var(--bord2);padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+@media(max-width:720px){.tana-left{border-right:none;border-bottom:1px solid var(--bord2)}}
+.tana-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--fg3);margin-bottom:2px}
+.bh-item{display:flex;align-items:center;gap:8px;padding:9px 11px;background:var(--surf2);border:1px solid var(--bord2);border-radius:var(--rsm)}
+.bh-rank{font-size:11px;font-weight:700;color:var(--fg3);min-width:18px}
+.bh-time{font-size:13px;font-weight:700}
+.bh-meta{font-size:10px;color:var(--fg3)}
+.bh-pl{font-size:13px;font-weight:800;margin-left:auto}
+.bh-pl.pos{color:var(--pos)}.bh-pl.neg{color:var(--neg)}
+.bh-empty{font-size:12px;color:var(--fg3)}
+.htable{width:100%;border-collapse:collapse;font-size:11px;font-variant-numeric:tabular-nums}
+.htable th{text-align:left;padding:6px 10px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--fg3);border-bottom:1px solid var(--bord);background:var(--surf2);white-space:nowrap}
+.htable td{padding:5px 10px;border-bottom:1px solid var(--bord2);white-space:nowrap}
+.htable tr:last-child td{border-bottom:none}
+.htable tr.h-best td{background:rgba(21,145,64,.09)}
+.htable tr.h-worst td{background:rgba(192,24,24,.09)}
+.htable tr.h-zero td{opacity:.35}
+.hbar{height:7px;border-radius:3px;display:inline-block;vertical-align:middle;min-width:2px}
+.hbar.pos{background:var(--pos)}.hbar.neg{background:var(--neg)}.hbar.zero{background:var(--fg3);width:2px}
+.dow-sec{padding:12px 16px 14px;border-top:1px solid var(--bord2)}
+.dow-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--fg3);margin-bottom:8px}
+.dow-row{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
+.dow-tile{flex:1;min-width:56px;background:var(--surf2);border:1.5px solid var(--bord2);border-radius:var(--rsm);padding:10px 6px;text-align:center;transition:border-color .15s}
+.dow-tile.best{border-color:var(--pos);background:var(--pos-bg)}
+.dow-tile.worst{border-color:var(--neg);background:var(--neg-bg)}
+.dow-tile.zero{opacity:.35}
+.dow-name{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--fg3)}
+.dow-pl{font-size:13px;font-weight:800;margin-top:4px}
+.dow-pl.pos{color:var(--pos)}.dow-pl.neg{color:var(--neg)}
+.dow-sub{font-size:10px;color:var(--fg3);margin-top:1px}
+/* ── SESSIONS ── */
+.sess-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;background:var(--surf2);border:1.5px solid var(--bord2);border-radius:var(--rsm);transition:border-color .15s}
+.sess-row:hover{border-color:var(--acc-dim)}
+.sess-num{font-size:11px;font-weight:800;color:var(--fg3);min-width:64px}
+.sess-time{padding:8px 10px;border:1.5px solid var(--bord);border-radius:var(--rsm);background:var(--bg);color:var(--fg);font-size:13px;width:108px;font-weight:600}
+.sess-time:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px var(--acc-dim)}
+.sess-sep{font-size:12px;color:var(--fg3);font-weight:600}
+.sess-info{font-size:11px;color:var(--fg3);flex:1;min-width:80px}
+.sess-del{background:transparent;border:1.5px solid var(--neg-dim);color:var(--neg);border-radius:var(--rxs);padding:5px 9px;font-size:12px;font-weight:800;flex-shrink:0;transition:background .12s}
+.sess-del:hover{background:var(--neg-bg)}
+.spl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.spl-table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.spl-table th{text-align:left;padding:7px 10px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--fg3);border-bottom:1px solid var(--bord);background:var(--surf2);white-space:nowrap}
+.spl-table td{padding:6px 10px;border-bottom:1px solid var(--bord2);white-space:nowrap}
+.spl-table tfoot td{font-weight:800;background:var(--surf2);border-top:2px solid var(--bord)}
+.sess-sum{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.ss-item{background:var(--surf2);border:1.5px solid var(--bord2);border-radius:var(--rsm);padding:10px 13px;min-width:88px}
+.ss-lbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--fg3)}
+.ss-val{font-size:18px;font-weight:800;margin-top:3px}
+.ss-val.pos{color:var(--pos)}.ss-val.neg{color:var(--neg)}
+/* ── TABLE ── */
+.tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+th{text-align:left;padding:8px 10px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--fg3);border-bottom:1px solid var(--bord);background:var(--surf2);white-space:nowrap;position:sticky;top:calc(var(--hdr-h) + var(--safe-t));z-index:2}
+td{padding:7px 10px;border-bottom:1px solid var(--bord2);white-space:nowrap;color:var(--fg)}
+tr:last-child td{border-bottom:none}
+tr.rwin td{background:rgba(21,145,64,.06)}
+tr.rloss td{background:rgba(192,24,24,.06)}
+tr.rsig td{background:rgba(26,72,192,.06)}
+tr.rcd td{background:rgba(146,64,14,.06)}
+.bdg{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em}
+.bdg-leaf{background:var(--acc-dim);color:var(--acc)}
+.bdg-other{background:var(--neu-bg);color:var(--neu-fg)}
+.bdg-sig{background:var(--sig-bg);color:var(--sig)}
+.bdg-win{background:var(--pos-bg);color:var(--pos)}
+.bdg-loss{background:var(--neg-bg);color:var(--neg)}
+.bdg-wait{background:var(--neu-bg);color:var(--neu-fg)}
+.bdg-cool{background:var(--warn-bg);color:var(--warn-fg)}
+.tfoot{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-top:1px solid var(--bord2);font-size:11px;color:var(--fg3);flex-wrap:wrap;gap:8px}
+/* ── IMPORT ── */
+.ibox{border:2px dashed var(--bord);border-radius:var(--rsm);padding:22px;text-align:center;transition:border-color .15s,background .15s}
+.ibox:hover,.ibox.drag{border-color:var(--acc);background:var(--acc-dim)}
+.ibox strong{font-size:13px;display:block;margin-bottom:4px}
+.ibox p{font-size:11px;color:var(--fg2)}
+.instr{background:var(--surf2);border:1px solid var(--bord);border-radius:var(--rsm);padding:13px;font-size:12px;line-height:1.9;color:var(--fg2)}
+.instr strong{color:var(--fg)}.instr ol{padding-left:18px}
+.instr code{background:var(--neu-bg);padding:1px 5px;border-radius:3px;font-size:11px;font-family:monospace}
+/* ── INSTALL GUIDE ── */
+.install-guide{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:540px){.install-guide{grid-template-columns:1fr}}
+.ig-card{background:var(--surf2);border:1px solid var(--bord2);border-radius:var(--rsm);padding:13px}
+.ig-icon{font-size:24px;margin-bottom:6px}
+.ig-title{font-size:12px;font-weight:800;margin-bottom:6px}
+.ig-steps{font-size:11px;color:var(--fg2);line-height:1.8;padding-left:16px}
+/* ── FAB ── */
+.fab{display:none;position:fixed;bottom:calc(20px + var(--safe-b));right:max(20px,var(--safe-r));z-index:40;background:linear-gradient(135deg,#3730A3,#6366F1);color:#fff;border:none;border-radius:999px;padding:14px 22px;font-size:14px;font-weight:800;box-shadow:0 4px 20px rgba(0,0,0,.3);align-items:center;gap:7px;transition:transform .1s,box-shadow .1s}
+.fab:active{transform:scale(.94);box-shadow:0 2px 10px rgba(0,0,0,.25)}
+@media(max-width:640px){.fab{display:flex}}
+/* ── TESTS ── */
+details.tests-card summary{padding:13px 16px;cursor:pointer;font-size:13px;font-weight:700;list-style:none;display:flex;align-items:center;justify-content:space-between;-webkit-user-select:none;user-select:none}
+details.tests-card summary::-webkit-details-marker{display:none}
+details.tests-card summary::after{content:"+";font-size:16px;color:var(--fg3)}
+details.tests-card[open] summary::after{content:"\2212"}
+.tgrid{display:flex;flex-direction:column;gap:3px;padding:0 14px 14px}
+.trow{display:flex;align-items:flex-start;gap:8px;padding:7px 11px;background:var(--surf2);border-radius:var(--rsm);font-size:11px}
+.tic{flex-shrink:0;margin-top:1px;font-size:13px}
+.tname{color:var(--fg2);flex:1;min-width:0}.tpass .tname{color:var(--pos)}.tfail .tname{color:var(--neg)}
+.tdetail{color:var(--fg3);font-size:10px;margin-top:2px}
+/* ── MISC ── */
+.expstrip{display:flex;gap:8px;flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--bord2)}
+.src-attr{font-size:10px;color:var(--fg3);padding:8px 16px;border-top:1px solid var(--bord2);text-align:right}
+.empty{text-align:center;padding:32px 16px;color:var(--fg3);font-size:13px}
+@media(max-width:480px){.hdr-in,.main,.dstrip-in{padding-left:max(14px,var(--safe-l));padding-right:max(14px,var(--safe-r))}}
+</style>
+</head>
+<body>
+
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="brand">
+      <div class="brand-ic">LS</div>
+      <div class="brand-txt"><h1>Lightning Storm</h1><p>Leaf Strategy Backtest</p></div>
+    </div>
+    <div class="hdr-acts">
+      <button class="btn-ghost btn-xs" id="installBtn" style="display:none">&#8681; Install</button>
+      <button class="btn-ghost" id="themeBtn">Auto</button>
+    </div>
+  </div>
+</header>
+
+<div id="installBanner" class="ibanner" style="display:none">
+  <div class="ibanner-txt">&#128241; Add to Home Screen &mdash; <span>open in browser &rarr; Share &rarr; Add to Home Screen</span></div>
+  <div class="ibanner-acts">
+    <button class="btn btn-sec btn-xs" onclick="showInstallGuide()">How?</button>
+    <button class="ibanner-close" id="dismissBanner">&#10005;</button>
+  </div>
+</div>
+
+<div class="dstrip">
+  <div class="dstrip-in">
+    <div class="dmeta"><span class="dot" id="sDot"></span><span id="sTxt">No data loaded</span><span id="sMeta" style="display:none"></span></div>
+    <div class="dbtns">
+      <button class="btn btn-sec btn-sm" id="fetchBtn">&#8635; Fetch</button>
+      <label class="btn btn-sec btn-sm" style="cursor:pointer">&#8679; CSV<input type="file" id="csvIn" accept=".csv,text/csv" style="display:none"></label>
+      <label class="btn btn-sec btn-sm" style="cursor:pointer">&#8679; JSON<input type="file" id="jsonIn" accept=".json,application/json" style="display:none"></label>
+      <button class="btn btn-del btn-sm" id="clearBtn" style="display:none">&#10005; Clear</button>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div id="noDataBanner" class="alert alert-info"><span class="alert-ic">&#8505;</span><span>No data loaded. Export CSV from <strong>casinodrop.com/tracker/lightningstorm/</strong> and use <strong>&#8679; CSV</strong> above.</span></div>
+  <div id="fetchErr" class="alert alert-err" style="display:none"><span class="alert-ic">&#9888;</span><span id="fetchErrTxt"></span></div>
+  <div id="winWarn" class="alert alert-warn" style="display:none"><span class="alert-ic">&#9888;</span><span>Selected window may start mid-streak. Simulation starts fresh.</span></div>
+
+  <div class="card">
+    <div class="ch"><h3>&#9881; Backtest Settings</h3><button class="btn btn-pri btn-sm" id="runBtn">&#9654; Run Backtest</button></div>
+    <div class="ctrls">
+      <div class="cg"><label>Time Window</label><select class="cs" id="winSel"><option value="1h">Last 1 hour</option><option value="6h">Last 6 hours</option><option value="12h">Last 12 hours</option><option value="24h">Last 24 hours</option><option value="3d">Last 3 days</option><option value="7d">Last 7 days</option><option value="all" selected>All available</option></select></div>
+      <div class="cg"><label>Starting Bankroll (&#8377;)</label><input type="number" class="ci" id="bankIn" value="10000" min="100" step="100" inputmode="numeric"></div>
+      <div class="cg"><label>Payout (net per unit)</label><select class="cs" id="payoutSel"><option value="1" selected>1:1 (assumed)</option><option value="0.97">0.97:1</option><option value="0.95">0.95:1</option></select></div>
+      <div class="cg"><label>Cooldown after 3-loss</label><select class="cs" id="cooldownSel"><option value="0">None</option><option value="30" selected>30 minutes</option><option value="45">45 minutes</option><option value="60">1 hour</option><option value="90">1.5 hours</option><option value="120">2 hours</option><option value="180">3 hours</option></select></div>
+    </div>
+    <div class="pnote">After losing &#8377;100+&#8377;200+&#8377;400 (3-step cycle), betting pauses for the cooldown period. Settings auto-saved.</div>
+  </div>
+
+  <div class="card"><div class="sec-label">Summary</div><div class="sgrid" id="sgrid"><div class="empty">Load data and run backtest to see results.</div></div></div>
+
+  <div class="crow">
+    <div class="card"><div class="cwrap"><h3>Bankroll Over Time</h3><div class="ccanvas"><canvas id="bChart"></canvas></div></div></div>
+    <div class="card"><div class="cwrap"><h3>Net P/L Per Bet</h3><div class="ccanvas"><canvas id="plChart"></canvas></div></div></div>
+  </div>
+
+  <div class="card" id="timeCard" style="display:none">
+    <div class="ch"><h3>Time Analysis <span class="ch-sub">India Standard Time</span></h3><span style="font-size:11px;color:var(--fg3)">UTC+5:30 &bull; 12-hr</span></div>
+    <div class="tana-wrap">
+      <div class="tana-left">
+        <div class="tana-lbl">&#9650; Best Hours</div><div id="bestHours"></div>
+        <div class="tana-lbl" style="margin-top:12px">&#9660; Worst Hours</div><div id="worstHours"></div>
+      </div>
+      <div><div class="tscroll"><table class="htable"><thead><tr><th>Hour (IST)</th><th>Bets</th><th>Wins</th><th>Losses</th><th>Win%</th><th>Net P/L</th><th style="min-width:80px">Bar</th></tr></thead><tbody id="htbody"></tbody></table></div></div>
+    </div>
+    <div class="dow-sec"><div class="dow-lbl">Day of Week (IST)</div><div class="dow-row" id="dowRow"></div></div>
+  </div>
+
+  <div class="card" id="sessCard">
+    <div class="ch">
+      <h3>&#128336; Betting Sessions <span class="ch-sub">IST daily schedule</span></h3>
+      <button class="btn btn-sec btn-sm" id="addSessBtn">+ Add slot</button>
+    </div>
+    <div class="cb" style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:12px;color:var(--fg2)">Define your daily betting windows. The table shows P/L per session so you can track which slot is profitable each day.</div>
+      <div id="sessList"></div>
+      <div id="sessPlWrap"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ch"><h3>&#128203; Round History</h3><span id="tblCount" style="font-size:11px;color:var(--fg3)"></span></div>
+    <div class="tscroll"><table><thead><tr><th>#</th><th>Time (IST)</th><th>Result</th><th>Action</th><th>Stake</th><th>P/L</th><th>Cum P/L</th><th>Bankroll</th><th>Next &#8377;</th></tr></thead><tbody id="tbody"><tr><td colspan="9" class="empty">No data loaded.</td></tr></tbody></table></div>
+    <div class="tfoot"><span id="tblInfo">&mdash;</span><div style="display:flex;gap:8px"><button class="btn btn-sec btn-sm" id="showMoreBtn" style="display:none">Show more</button><button class="btn btn-sec btn-sm" id="expRoundsBtn" style="display:none">&#8681; Export CSV</button></div></div>
+  </div>
+
+  <div class="card">
+    <div class="ch"><h3>&#128190; Data Import</h3></div>
+    <div class="cb" style="display:flex;flex-direction:column;gap:12px">
+      <div class="instr"><strong>How to get real Lightning Storm data:</strong><ol><li>Open <strong>casinodrop.com/tracker/lightningstorm/</strong></li><li>Select time range &rarr; click <strong>Export CSV</strong></li><li>Import here using <strong>&#8679; CSV</strong> or drag below</li></ol>Expected columns: <code>settled_at_utc</code> and <code>outcome</code>.</div>
+      <div id="dropZone" class="ibox"><strong>&#128196; Drop CSV or JSON here</strong><p>or use the Import buttons in the toolbar above</p></div>
+      <div id="expStrip" class="expstrip" style="display:none"><button class="btn btn-sec btn-sm" id="expNormBtn">&#8681; Normalized JSON</button><button class="btn btn-sec btn-sm" id="expBackBtn">&#8681; Backtest CSV</button></div>
+    </div>
+    <div class="src-attr">Data: casinodrop.com (manual export) &nbsp;|&nbsp; Simulation only &mdash; not financial advice.</div>
+  </div>
+
+  <div class="card" id="installGuideCard" style="display:none">
+    <div class="ch"><h3>&#128241; Install on Phone</h3><button class="btn btn-sec btn-sm" id="closeGuideBtn">Close</button></div>
+    <div class="cb" style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-size:12px;color:var(--fg2)">Install this dashboard as a home screen app for quick daily access &mdash; no app store needed.</div>
+      <div class="install-guide">
+        <div class="ig-card">
+          <div class="ig-icon">&#63743;</div>
+          <div class="ig-title">iPhone / iPad (Safari)</div>
+          <ol class="ig-steps"><li>Open this file in <strong>Safari</strong></li><li>Tap the <strong>Share</strong> button (&#8679;)</li><li>Scroll down &rarr; tap <strong>Add to Home Screen</strong></li><li>Tap <strong>Add</strong> &mdash; done!</li></ol>
+        </div>
+        <div class="ig-card">
+          <div class="ig-icon">&#129664;</div>
+          <div class="ig-title">Android (Chrome)</div>
+          <ol class="ig-steps"><li>Open this file in <strong>Chrome</strong></li><li>Tap the <strong>&#8942; menu</strong> (3 dots)</li><li>Tap <strong>Add to Home screen</strong></li><li>Tap <strong>Add</strong> &mdash; done!</li></ol>
+        </div>
+      </div>
+      <div class="alert alert-info" style="font-size:11px"><span class="alert-ic">&#8505;</span><span>For best experience, save this HTML file to your phone storage and open it in your browser. All data stays on your device &mdash; nothing is sent to any server.</span></div>
+    </div>
+  </div>
+
+  <details class="card tests-card" id="testsCard"><summary>Strategy Engine Tests <span id="testSum" style="font-size:11px;font-weight:400;color:var(--fg3);margin-left:8px"></span></summary><div class="tgrid" id="tgrid"></div></details>
+</div>
+
+<button class="fab" id="fabRun">&#9654; Run</button>
+
+<script>
+/* ── PWA MANIFEST ── */
+(function(){
+  try{
+    var m={name:'Lightning Storm Backtest',short_name:'LS Backtest',description:'Leaf strategy backtesting dashboard',display:'standalone',orientation:'any',theme_color:'#186B32',background_color:'#090E0B',start_url:'.',icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23186B32"/><text y="72" x="18" font-size="68" font-family="system-ui">⚡</text></svg>',sizes:'any',type:'image/svg+xml'}]};
+    var l=document.createElement('link');l.rel='manifest';l.href='data:application/manifest+json,'+encodeURIComponent(JSON.stringify(m));document.head.appendChild(l);
+  }catch(e){}
+})();
+
+/* ── STRATEGY ENGINE ── */
+function isLeaf(r){if(typeof r!=='string')return false;var n=r.trim().toLowerCase().replace(/\s+/g,' ');return n==='leaf'||n==='evo leaf'||n==='evoleaf';}
+function validateRecord(rec){if(!rec||typeof rec!=='object')return{valid:false};if(rec.timestamp==null)return{valid:false};if(isNaN(new Date(rec.timestamp).getTime()))return{valid:false};if(rec.result==null||rec.result==='')return{valid:false};return{valid:true};}
+function normalizeRecords(recs){var valid=recs.filter(function(r){return validateRecord(r).valid;});var seen=new Set(),deduped=[];for(var i=0;i<valid.length;i++){var r=valid[i];var key=(r.roundId!=null&&r.roundId!=='')?'id:'+r.roundId:'ts:'+new Date(r.timestamp).getTime()+':'+r.result;if(!seen.has(key)){seen.add(key);deduped.push(r);}}var idx=deduped.map(function(r,i){return[r,i];});idx.sort(function(a,b){var ta=new Date(a[0].timestamp).getTime(),tb=new Date(b[0].timestamp).getTime();return ta!==tb?ta-tb:a[1]-b[1];});return idx.map(function(x){return x[0];});}
+function stakeFor(lv){return lv===1?100:lv===2?200:400;}
+function nextLv(lv){return lv===1?2:lv===2?3:1;}
+function runBacktest(recs,opts){
+  var o=opts||{},sb=o.startingBankroll!==undefined?o.startingBankroll:10000,pm=o.payoutMultiplier!==undefined?o.payoutMultiplier:1,cdMs=(o.cooldownMinutes||0)*60000;
+  var norm=normalizeRecords(recs),state='WAITING_FOR_LEAF',lv=1,bank=sb,cumPL=0,peak=sb,maxDD=0;
+  var totBets=0,wins=0,losses=0,wagered=0,signals=0,streaks=0,curBets=0,longestStr=0,strLens=[];
+  var curLoss=0,longestLoss=0,cdPeriods=0,cdRounds=0,cooldownUntil=null,rounds=[];
+  for(var i=0;i<norm.length;i++){
+    var rec=norm[i],recMs=new Date(rec.timestamp).getTime(),leaf=isLeaf(rec.result);
+    if(state==='COOLDOWN'&&cdMs>0&&cooldownUntil!==null&&recMs>=cooldownUntil){state='WAITING_FOR_LEAF';cooldownUntil=null;}
+    var action,bet=false,stake=0,outcome=null,net=0;
+    if(state==='COOLDOWN'){action='COOLDOWN_WAIT';cdRounds++;}
+    else if(state==='WAITING_FOR_LEAF'){if(!leaf){action='WAIT_NON_LEAF';}else{action='SIGNAL';state='LEAF_STREAK_ACTIVE';signals++;streaks++;curBets=0;}}
+    else{bet=true;stake=stakeFor(lv);wagered+=stake;totBets++;
+      if(leaf){action='BET_WIN';outcome='win';net=stake*pm;wins++;lv=1;curBets++;curLoss=0;}
+      else{action='BET_LOSS';outcome='loss';net=-stake;losses++;var prevLv=lv;lv=nextLv(lv);curLoss++;
+        if(curLoss>longestLoss)longestLoss=curLoss;if(curBets>longestStr)longestStr=curBets;strLens.push(curBets);curBets=0;
+        if(prevLv===3&&cdMs>0){state='COOLDOWN';cooldownUntil=recMs+cdMs;cdPeriods++;}else{state='WAITING_FOR_LEAF';}}}
+    cumPL+=net;bank+=net;if(bank>peak)peak=bank;var dd=peak-bank;if(dd>maxDD)maxDD=dd;
+    rounds.push({roundId:rec.roundId!=null?rec.roundId:null,timestamp:rec.timestamp,result:rec.result,isLeaf:leaf,action:action,betPlaced:bet,stake:stake,outcome:outcome,netPL:net,cumulativePL:cumPL,bankroll:bank,progressionLevel:lv,nextStake:stakeFor(lv),streakActiveAfter:state==='LEAF_STREAK_ACTIVE',inCooldown:state==='COOLDOWN',cooldownUntil:cooldownUntil?new Date(cooldownUntil).toISOString():null});
+  }
+  if(state==='LEAF_STREAK_ACTIVE'&&curBets>0){if(curBets>longestStr)longestStr=curBets;strLens.push(curBets);}
+  var avgStr=strLens.length>0?strLens.reduce(function(a,b){return a+b;},0)/strLens.length:0;
+  return{rounds:rounds,summary:{totalRounds:norm.length,totalBets:totBets,wins:wins,losses:losses,winRate:totBets>0?wins/totBets:0,totalWagered:wagered,netPL:cumPL,finalBankroll:bank,leafSignals:signals,leafStreaks:streaks,avgStreakLength:avgStr,longestStreak:longestStr,maxDrawdown:maxDD,longestLosingStreak:longestLoss,currentStake:stakeFor(lv),currentProgressionLevel:lv,cooldownPeriods:cdPeriods,cooldownRounds:cdRounds}};
+}
+
+/* ── TESTS ── */
+function mkR(results,baseMs){var base=baseMs||new Date('2026-01-01T00:00:00Z').getTime();return results.map(function(r,i){return{result:r,timestamp:new Date(base+i*60000).toISOString(),roundId:'r'+i};});}
+function runTests(){
+  var out=[];
+  function test(id,name,fn){try{var r=fn();out.push({id:id,name:name,passed:r.passed,detail:r.detail||''});}catch(e){out.push({id:id,name:name,passed:false,detail:'ERROR: '+e.message});}}
+  test(1,'No Leaf → zero bets',function(){var s=runBacktest(mkR(['Battery Charger','Monster Mash','Hot Spot'])).summary;return{passed:s.totalBets===0,detail:'bets='+s.totalBets};});
+  test(2,'First Leaf → signal only, no bet',function(){var r=runBacktest(mkR(['Number','Leaf']));var rd=r.rounds[1];return{passed:rd.action==='SIGNAL'&&!rd.betPlaced&&r.summary.totalBets===0,detail:'action='+rd.action};});
+  test(3,'Signal then Leaf → 1 win at ₹100',function(){var r=runBacktest(mkR(['Number','Leaf','Leaf']));var b=r.rounds[2];return{passed:r.summary.totalBets===1&&b.action==='BET_WIN'&&b.stake===100&&b.netPL===100,detail:'stake='+b.stake};});
+  test(4,'Three Leaves after signal → 3 bets',function(){var r=runBacktest(mkR(['Number','Leaf','Leaf','Leaf','Leaf']));return{passed:r.summary.totalBets===3,detail:'bets='+r.summary.totalBets};});
+  test(5,'Streak-ending Number → losing bet',function(){var r=runBacktest(mkR(['Leaf','Leaf','Number']));var rd=r.rounds[2];return{passed:rd.betPlaced&&rd.outcome==='loss'&&!rd.streakActiveAfter,detail:'outcome='+rd.outcome};});
+  test(6,'Streak-ending MonsterMash → losing bet',function(){var r=runBacktest(mkR(['Leaf','Leaf','Monster Mash']));var rd=r.rounds[2];return{passed:rd.betPlaced&&rd.outcome==='loss'&&!rd.streakActiveAfter,detail:'outcome='+rd.outcome};});
+  test(7,'No bets while waiting',function(){var r=runBacktest(mkR(['Leaf','Number','Battery Charger','Hot Spot','Fireball']));var wait=r.rounds.slice(2);return{passed:wait.every(function(x){return!x.betPlaced;})};});
+  test(8,'New Leaf after streak end → signal only',function(){var r=runBacktest(mkR(['Leaf','Number','Leaf']));var rd=r.rounds[2];return{passed:rd.action==='SIGNAL'&&!rd.betPlaced};});
+  test(9,'Win resets next stake to ₹100',function(){var r=runBacktest(mkR(['Leaf','Number','Leaf','Leaf']));var rd=r.rounds[3];return{passed:rd.outcome==='win'&&rd.stake===200&&rd.nextStake===100};});
+  test(10,'₹100 loss → next stake ₹200',function(){var r=runBacktest(mkR(['Leaf','Number']));var rd=r.rounds[1];return{passed:rd.stake===100&&rd.outcome==='loss'&&rd.nextStake===200};});
+  test(11,'₹200 loss → next stake ₹400',function(){var r=runBacktest(mkR(['Leaf','Number','Leaf','Number']));var rd=r.rounds[3];return{passed:rd.stake===200&&rd.outcome==='loss'&&rd.nextStake===400};});
+  test(12,'₹400 loss → reset to ₹100',function(){var r=runBacktest(mkR(['Leaf','Number','Leaf','Number','Leaf','Number']));var rd=r.rounds[5];return{passed:rd.stake===400&&rd.outcome==='loss'&&rd.nextStake===100};});
+  test(13,'Progression never exceeds ₹400',function(){var seq=[];for(var i=0;i<20;i++){seq.push('Leaf');seq.push('Number');}var r=runBacktest(mkR(seq));var maxS=Math.max.apply(null,r.rounds.filter(function(x){return x.betPlaced;}).map(function(x){return x.stake;}));return{passed:maxS<=400,detail:'maxStake='+maxS};});
+  test(14,'New streak inherits progression level',function(){var r=runBacktest(mkR(['Leaf','Number','Leaf','Leaf']));var rd=r.rounds[3];return{passed:rd.betPlaced&&rd.stake===200};});
+  test(15,'N Leaves after signal = N bets',function(){var s=runBacktest(mkR(['Number','Leaf','Leaf','Leaf','Leaf','Leaf','Leaf'])).summary;return{passed:s.totalBets===5};});
+  test(16,'Duplicate roundId → deduplicated',function(){var base=new Date('2026-01-01T00:00:00Z').getTime();var recs=[{result:'Leaf',timestamp:new Date(base).toISOString(),roundId:'r0'},{result:'Leaf',timestamp:new Date(base+60000).toISOString(),roundId:'r1'},{result:'Leaf',timestamp:new Date(base+60000).toISOString(),roundId:'r1'},{result:'Number',timestamp:new Date(base+120000).toISOString(),roundId:'r2'}];var s=runBacktest(recs).summary;return{passed:s.totalBets===2};});
+  test(17,'Newest-first input normalized correctly',function(){var base=new Date('2026-01-01T00:00:00Z').getTime();var recs=[{result:'Number',timestamp:new Date(base+120000).toISOString(),roundId:'r2'},{result:'Leaf',timestamp:new Date(base+60000).toISOString(),roundId:'r1'},{result:'Leaf',timestamp:new Date(base).toISOString(),roundId:'r0'}];var r=runBacktest(recs);return{passed:r.rounds[0].action==='SIGNAL'&&r.rounds[1].action==='BET_WIN'&&r.rounds[2].action==='BET_LOSS'};});
+  test(18,'Identical timestamps → no crash',function(){var ts=new Date('2026-01-01T00:00:00Z').toISOString();var recs=[{result:'Leaf',timestamp:ts,roundId:'r0'},{result:'Leaf',timestamp:ts,roundId:'r1'},{result:'Number',timestamp:ts,roundId:'r2'}];var err=null,res;try{res=runBacktest(recs);}catch(e){err=e.message;}return{passed:!err&&res.rounds.length===3};});
+  test(19,'Missing result → record rejected',function(){var base=new Date('2026-01-01T00:00:00Z').getTime();var recs=[{result:null,timestamp:new Date(base).toISOString(),roundId:'r0'},{result:'Leaf',timestamp:new Date(base+120000).toISOString(),roundId:'r2'}];var r=runBacktest(recs);return{passed:r.rounds.length===1};});
+  test(20,'Key metrics match manual calc',function(){var s=runBacktest(mkR(['Number','Leaf','Leaf','Leaf','Number']),{startingBankroll:10000}).summary;return{passed:s.netPL===100&&s.finalBankroll===10100&&s.totalBets===3&&s.wins===2&&s.losses===1};});
+  test(21,'Signal Leaf: betPlaced=false',function(){var r=runBacktest(mkR(['Number','Leaf']));var rd=r.rounds[1];return{passed:!rd.betPlaced&&rd.action==='SIGNAL'};});
+  test(22,'First non-Leaf after streak → BET_LOSS',function(){var r=runBacktest(mkR(['Leaf','Leaf','Battery Charger']));var rd=r.rounds[2];return{passed:rd.betPlaced&&rd.outcome==='loss'};});
+  test(23,'winRate correct',function(){var s=runBacktest(mkR(['Number','Leaf','Leaf','Leaf','Number']),{startingBankroll:10000}).summary;return{passed:Math.abs(s.winRate-2/3)<0.001};});
+  test(24,'3-step loss cycle triggers cooldown',function(){var r=runBacktest(mkR(['Leaf','Number','Leaf','Number','Leaf','Number']),{cooldownMinutes:30});var last=r.rounds[5];return{passed:last.action==='BET_LOSS'&&last.inCooldown};});
+  test(25,'Round within cooldown → COOLDOWN_WAIT',function(){var r=runBacktest(mkR(['Leaf','Number','Leaf','Number','Leaf','Number','Leaf']),{cooldownMinutes:30});var cd=r.rounds[6];return{passed:cd.action==='COOLDOWN_WAIT'&&!cd.betPlaced};});
+  return out;
+}
+
+/* ── CSV / JSON PARSING ── */
+function parseCSVRow(line){var cols=[],q=false,cur='';for(var i=0;i<line.length;i++){var c=line[i];if(c==='"'&&!q)q=true;else if(c==='"'&&q)q=false;else if(c===','&&!q){cols.push(cur);cur='';}else cur+=c;}cols.push(cur);return cols;}
+function parseCSV(text){
+  var lines=text.trim().split(/\r?\n/);if(lines.length<2)return{records:[],errors:['No data rows']};
+  var hdrs=parseCSVRow(lines[0]).map(function(h){return h.trim().toLowerCase().replace(/[^a-z0-9]/g,'');});
+  var ti=hdrs.findIndex(function(h){return h.includes('time')||h.includes('date')||h.includes('timestamp')||h.includes('utc')||h.includes('settled');});
+  var ri=hdrs.findIndex(function(h){return h.includes('result')||h.includes('outcome');});
+  if(ti===-1)return{records:[],errors:['No time/date column. Headers: '+hdrs.join(', ')]};
+  if(ri===-1)return{records:[],errors:['No result/outcome column. Headers: '+hdrs.join(', ')]};
+  var records=[],errors=[];
+  for(var i=1;i<lines.length;i++){var line=lines[i].trim();if(!line)continue;var cols=parseCSVRow(line);var rawT=(cols[ti]||'').trim(),rawR=(cols[ri]||'').trim();if(!rawR){errors.push('Row '+(i+1)+': empty result');continue;}var ts=new Date(rawT);if(isNaN(ts.getTime()))ts=new Date(rawT.replace(' ','T')+':00Z');if(isNaN(ts.getTime())){errors.push('Row '+(i+1)+': bad time "'+rawT+'"');continue;}records.push({timestamp:ts.toISOString(),result:rawR,roundId:'csv_'+i});}
+  return{records:records,errors:errors};
+}
+function parseJSONData(text){var data;try{data=JSON.parse(text);}catch(e){return{records:[],errors:['Invalid JSON']};}var arr=Array.isArray(data)?data:(data.records||data.data||data.history||data.rounds||[]);if(!Array.isArray(arr))return{records:[],errors:['JSON must be array or have records/data/rounds field']};var records=[],errors=[];arr.forEach(function(item,i){if(!item||typeof item!=='object'){errors.push('Item '+i+': not object');return;}var ts=item.timestamp||item.time||item.date||item.Time||item.DATE||item.settled_at_utc;var res=item.result||item.Result||item.outcome||item.Outcome||item.segment;if(!ts||!res)return;var d=new Date(String(ts).replace(' ','T'));if(isNaN(d.getTime()))return;records.push({timestamp:d.toISOString(),result:String(res),roundId:item.roundId||item.id||('json_'+i)});});return{records:records,errors:errors};}
+
+/* ── IST HELPERS ── */
+var IST_MS=19800000;
+function toIST(ts){return new Date(new Date(ts).getTime()+IST_MS);}
+function ISTHour(ts){return toIST(ts).getUTCHours();}
+function ISTDay(ts){return toIST(ts).getUTCDay();}
+function ISTMinutes(ts){var d=toIST(ts);return d.getUTCHours()*60+d.getUTCMinutes();}
+var DAY_NAMES=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function fHour12(h){if(h===0)return'12 AM';if(h<12)return h+' AM';if(h===12)return'12 PM';return(h-12)+' PM';}
+function fISTShort(ts){var d=toIST(ts),h=d.getUTCHours(),m=d.getUTCMinutes(),ampm=h>=12?'PM':'AM',h12=h%12||12;return String(h12)+':'+String(m).padStart(2,'0')+' '+ampm;}
+function fISTDate(ts){var d=toIST(ts);return String(d.getUTCDate()).padStart(2,'0')+'/'+String(d.getUTCMonth()+1).padStart(2,'0');}
+function fISTDateKey(ts){var d=toIST(ts);return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');}
+function fDateDisp(dateStr){var p=dateStr.split('-');return p[2]+'/'+p[1];}
+
+/* ── SESSION HELPERS ── */
+function parseTimeToMin(val){if(!val)return 0;var p=val.split(':');return parseInt(p[0]||0)*60+parseInt(p[1]||0);}
+function minToTimeVal(min){var h=Math.floor(min/60)%24,m=min%60;return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');}
+function fTimeMin(min){var h=Math.floor(min/60)%24,m=min%60,ampm=h>=12?'PM':'AM',h12=h%12||12;return h12+':'+String(m).padStart(2,'0')+' '+ampm;}
+function sessLen(s){var d=s.end>s.start?s.end-s.start:1440-s.start+s.end;return(d/60).toFixed(1);}
+function isInAnySession(ts){if(!APP.sessions.length)return false;var m=ISTMinutes(ts);return APP.sessions.some(function(s){return s.start<=s.end?(m>=s.start&&m<s.end):(m>=s.start||m<s.end);});}
+
+/* ── FORMATTERS ── */
+function fINR(n){var abs=Math.abs(n),sign=n<0?'−':'';return sign+'₹'+abs.toLocaleString('en-IN',{maximumFractionDigits:0});}
+function fPct(n){return(n*100).toFixed(1)+'%';}
+function fNum(n,dec){dec=dec===undefined?1:dec;return n.toLocaleString('en-IN',{maximumFractionDigits:dec});}
+function escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+/* ── WINDOW FILTER ── */
+function filterByWindow(recs,win){if(win==='all')return recs;var sorted=recs.slice().sort(function(a,b){return new Date(a.timestamp)-new Date(b.timestamp);});if(!sorted.length)return[];var latest=new Date(sorted[sorted.length-1].timestamp).getTime();var ms={'1h':3600000,'6h':21600000,'12h':43200000,'24h':86400000,'3d':259200000,'7d':604800000};var cutoff=latest-(ms[win]||0);return sorted.filter(function(r){return new Date(r.timestamp).getTime()>=cutoff;});}
+
+/* ── APP STATE ── */
+var APP={raw:[],src:{name:null},result:null,rowLimit:100,sessions:[{start:0,end:120}]};
+
+/* ── LOCALSTORAGE ── */
+function saveSettings(){
+  try{
+    localStorage.setItem('ls_sessions',JSON.stringify(APP.sessions));
+    localStorage.setItem('ls_cfg',JSON.stringify({win:document.getElementById('winSel').value,bank:document.getElementById('bankIn').value,pay:document.getElementById('payoutSel').value,cd:document.getElementById('cooldownSel').value}));
+  }catch(e){}
+}
+function loadSettings(){
+  try{
+    var sess=localStorage.getItem('ls_sessions');
+    if(sess){var s=JSON.parse(sess);if(Array.isArray(s)&&s.length)APP.sessions=s;}
+    var cfg=localStorage.getItem('ls_cfg');
+    if(cfg){var c=JSON.parse(cfg);
+      if(c.win)document.getElementById('winSel').value=c.win;
+      if(c.bank)document.getElementById('bankIn').value=c.bank;
+      if(c.pay)document.getElementById('payoutSel').value=c.pay;
+      if(c.cd)document.getElementById('cooldownSel').value=c.cd;
+    }
+  }catch(e){}
+}
+
+/* ── STATUS ── */
+function setStatus(s,txt,meta){document.getElementById('sDot').className='dot'+(s==='ok'?' ok':s==='err'?' err':s==='busy'?' busy':'');document.getElementById('sTxt').textContent=txt||'';var sm=document.getElementById('sMeta');sm.textContent=meta||'';sm.style.display=meta?'':'none';}
+
+/* ── RENDER STATS ── */
+function renderStats(s,sb){
+  var cards=[
+    {l:'Net P/L',v:fINR(s.netPL),cls:s.netPL>=0?'pos':'neg',sub:'from ₹'+sb.toLocaleString('en-IN'),sc:s.netPL>=0?'pos':'neg'},
+    {l:'Current Bankroll',v:fINR(s.finalBankroll),cls:s.netPL>=0?'pos':'neg',sc:s.netPL>=0?'pos':'neg'},
+    {l:'Win Rate',v:fPct(s.winRate),cls:s.winRate>=0.5?'pos':'neg',sub:s.wins+'W / '+s.losses+'L',sc:s.winRate>=0.5?'pos':'neg'},
+    {l:'Total Wagered',v:fINR(s.totalWagered),sub:s.totalBets+' bets'},
+    {l:'Leaf Signals',v:fNum(s.leafSignals,0),sub:s.leafStreaks+' streaks'},
+    {l:'Longest Streak',v:fNum(s.longestStreak,0)+' wins',sub:'avg '+fNum(s.avgStreakLength)},
+    {l:'Max Drawdown',v:fINR(s.maxDrawdown),cls:'neg',sc:'neg'},
+    {l:'Longest Loss Run',v:fNum(s.longestLosingStreak,0)+' bets'},
+    {l:'Total Rounds',v:fNum(s.totalRounds,0),sub:'in window'},
+    {l:'Next Bet Stake',v:'₹'+s.currentStake,sub:'level '+s.currentProgressionLevel},
+    {l:'3-Loss Cycles',v:fNum(s.cooldownPeriods,0),cls:s.cooldownPeriods>0?'warn':'',sub:s.cooldownPeriods>0?'cooldown triggered':'none',sc:s.cooldownPeriods>0?'warn':''},
+    {l:'Rounds in Cooldown',v:fNum(s.cooldownRounds,0),sub:s.cooldownRounds>0?'rounds skipped':'none'},
+  ];
+  document.getElementById('sgrid').innerHTML=cards.map(function(c){return'<div class="sc'+(c.sc?' '+c.sc:'')+'"><div class="sl">'+c.l+'</div><div class="sv'+(c.cls?' '+c.cls:'')+'">'+c.v+'</div>'+(c.sub?'<div class="ssub">'+escH(c.sub)+'</div>':'')+'</div>';}).join('');
+}
+
+/* ── CHARTS ── */
+function getCC(){var dark=document.documentElement.getAttribute('data-theme')==='dark'||(!document.documentElement.getAttribute('data-theme')&&window.matchMedia('(prefers-color-scheme:dark)').matches);return{grid:dark?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)',tick:dark?'#517A5C':'#759980',pos:dark?'#2DBB60':'#159140',neg:dark?'#F06060':'#C01818',line:dark?'#2DBB60':'#166430',fill:dark?'rgba(45,187,96,.10)':'rgba(22,100,48,.09)'};}
+var bCI=null,plCI=null;
+function renderCharts(rounds){
+  if(!window.Chart)return;
+  var bets=rounds.filter(function(r){return r.betPlaced;}),sb=rounds.length>0?rounds[0].bankroll-rounds[0].netPL:0;
+  var bData=[sb].concat(bets.map(function(r){return r.bankroll;})),cc=getCC();
+  var base={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false,backgroundColor:cc.tick+'cc',titleColor:'#fff',bodyColor:'#fff'}},scales:{x:{grid:{color:cc.grid},ticks:{color:cc.tick,maxTicksLimit:7,font:{size:10}}},y:{grid:{color:cc.grid},ticks:{color:cc.tick,font:{size:10},callback:function(v){return'₹'+Math.round(v).toLocaleString('en-IN');}}}}};
+  if(bCI)bCI.destroy();bCI=new Chart(document.getElementById('bChart').getContext('2d'),{type:'line',data:{labels:['Start'].concat(bets.map(function(_,i){return'B'+(i+1);})),datasets:[{data:bData,borderColor:cc.line,backgroundColor:cc.fill,fill:true,tension:.3,pointRadius:bData.length>80?0:3,pointHoverRadius:5,borderWidth:2}]},options:base});
+  var plData=bets.map(function(r){return r.netPL;});
+  if(plCI)plCI.destroy();plCI=new Chart(document.getElementById('plChart').getContext('2d'),{type:'bar',data:{labels:bets.map(function(_,i){return'B'+(i+1);}),datasets:[{data:plData,backgroundColor:plData.map(function(v){return v>=0?cc.pos:cc.neg;}),borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{mode:'index',intersect:false}},scales:{x:{grid:{color:cc.grid},ticks:{color:cc.tick,maxTicksLimit:7,font:{size:10}}},y:{grid:{color:cc.grid},ticks:{color:cc.tick,font:{size:10},callback:function(v){return'₹'+v;}}}}}});
+}
+
+/* ── TIME ANALYSIS ── */
+function renderTimeAnalysis(rounds){
+  var card=document.getElementById('timeCard'),bets=rounds.filter(function(r){return r.betPlaced;});
+  if(!bets.length){card.style.display='none';return;}card.style.display='';
+  var hd={};for(var h=0;h<24;h++)hd[h]={bets:0,wins:0,losses:0,netPL:0};
+  bets.forEach(function(r){var h=ISTHour(r.timestamp);hd[h].bets++;if(r.outcome==='win')hd[h].wins++;else hd[h].losses++;hd[h].netPL+=r.netPL;});
+  var maxAbs=1;for(var h2=0;h2<24;h2++){if(Math.abs(hd[h2].netPL)>maxAbs)maxAbs=Math.abs(hd[h2].netPL);}
+  var active=[];for(var h3=0;h3<24;h3++){if(hd[h3].bets>=2)active.push({h:h3,d:hd[h3]});}
+  var byPL=active.slice().sort(function(a,b){return b.d.netPL-a.d.netPL;}),best3=byPL.slice(0,3),worst3=byPL.slice(-3).reverse();
+  function renderHC(arr,elId){var el=document.getElementById(elId);if(!arr.length){el.innerHTML='<div class="bh-empty">Need ≥2 bets/hr</div>';return;}el.innerHTML=arr.map(function(item,i){var wr=item.d.bets>0?item.d.wins/item.d.bets:0,plCls=item.d.netPL>=0?'pos':'neg';return'<div class="bh-item"><span class="bh-rank">'+(i+1)+'.</span><div><div class="bh-time">'+fHour12(item.h)+'</div><div class="bh-meta">'+item.d.bets+' bets &bull; '+fPct(wr)+' win</div></div><span class="bh-pl '+plCls+'">'+fINR(item.d.netPL)+'</span></div>';}).join('');}
+  renderHC(best3,'bestHours');renderHC(worst3,'worstHours');
+  var bestH=best3.length>0?best3[0].h:-1,worstH=worst3.length>0?worst3[0].h:-1;
+  var rows=[];
+  for(var h4=0;h4<24;h4++){var d=hd[h4],rowCls=d.bets===0?'h-zero':(h4===bestH&&d.bets>=2?'h-best':(h4===worstH&&d.bets>=2?'h-worst':''));var wr=d.bets>0?fPct(d.wins/d.bets):'—',plStr=d.bets===0?'—':fINR(d.netPL);var plStyle=d.netPL>0?'color:var(--pos)':d.netPL<0?'color:var(--neg)':'';var barW=d.bets>0?Math.max(2,Math.round(Math.abs(d.netPL)/maxAbs*76)):0,barCls=d.netPL>0?'pos':d.netPL<0?'neg':'zero';rows.push('<tr class="'+rowCls+'"><td><strong>'+fHour12(h4)+'</strong></td><td>'+d.bets+'</td><td style="color:var(--pos)">'+d.wins+'</td><td style="color:var(--neg)">'+d.losses+'</td><td>'+wr+'</td><td style="'+plStyle+'">'+plStr+'</td><td>'+(d.bets>0?'<span class="hbar '+barCls+'" style="width:'+barW+'px"></span>':'—')+'</td></tr>');}
+  document.getElementById('htbody').innerHTML=rows.join('');
+  var dd={};for(var dw=0;dw<7;dw++)dd[dw]={bets:0,wins:0,losses:0,netPL:0};
+  bets.forEach(function(r){var dw=ISTDay(r.timestamp);dd[dw].bets++;if(r.outcome==='win')dd[dw].wins++;else dd[dw].losses++;dd[dw].netPL+=r.netPL;});
+  var bD=-1,wD=-1,bPL=-Infinity,wPL=Infinity;
+  for(var dw2=0;dw2<7;dw2++){if(dd[dw2].bets>=2){if(dd[dw2].netPL>bPL){bPL=dd[dw2].netPL;bD=dw2;}if(dd[dw2].netPL<wPL){wPL=dd[dw2].netPL;wD=dw2;}}}
+  document.getElementById('dowRow').innerHTML=DAY_NAMES.map(function(name,di){var d=dd[di],cls=d.bets===0?'zero':(di===bD?'best':(di===wD?'worst':'')),plCls=d.netPL>0?' pos':d.netPL<0?' neg':'';return'<div class="dow-tile '+cls+'"><div class="dow-name">'+name+'</div><div class="dow-pl'+plCls+'">'+(d.bets===0?'—':fINR(d.netPL))+'</div><div class="dow-sub">'+d.bets+(d.bets>0?' &bull; '+fPct(d.wins/d.bets):'')+'</div></div>';}).join('');
+}
+
+/* ── SESSION UI ── */
+function renderSessionList(){
+  var list=document.getElementById('sessList');
+  if(!APP.sessions.length){list.innerHTML='<div style="font-size:12px;color:var(--fg3);padding:4px 0">No sessions. Tap <strong>+ Add slot</strong> to define a daily betting window.</div>';document.getElementById('sessPlWrap').innerHTML='';return;}
+  list.innerHTML=APP.sessions.map(function(s,i){
+    return'<div class="sess-row"><span class="sess-num">Session '+(i+1)+'</span>'+
+    '<input type="time" class="sess-time" data-i="'+i+'" data-f="s" value="'+minToTimeVal(s.start)+'">'+
+    '<span class="sess-sep">to</span>'+
+    '<input type="time" class="sess-time" data-i="'+i+'" data-f="e" value="'+minToTimeVal(s.end)+'">'+
+    '<span class="sess-info">'+fTimeMin(s.start)+' – '+fTimeMin(s.end)+' &nbsp;· '+sessLen(s)+'h</span>'+
+    '<button class="sess-del" data-i="'+i+'">×</button></div>';
+  }).join('');
+  list.querySelectorAll('.sess-time').forEach(function(inp){inp.addEventListener('change',function(){var i=parseInt(this.dataset.i),min=parseTimeToMin(this.value);if(this.dataset.f==='s')APP.sessions[i].start=min;else APP.sessions[i].end=min;renderSessionList();if(APP.result)renderSessionPL(APP.result.rounds);saveSettings();});});
+  list.querySelectorAll('.sess-del').forEach(function(btn){btn.addEventListener('click',function(){APP.sessions.splice(parseInt(this.dataset.i),1);renderSessionList();if(APP.result)renderSessionPL(APP.result.rounds);saveSettings();});});
+}
+function renderSessionPL(rounds){
+  var wrap=document.getElementById('sessPlWrap');
+  if(!APP.sessions.length){wrap.innerHTML='';return;}
+  var bets=rounds.filter(function(r){return r.betPlaced;}),groups={};
+  bets.forEach(function(r){var m=ISTMinutes(r.timestamp),dateKey=fISTDateKey(r.timestamp);APP.sessions.forEach(function(s,si){var inside=s.start<=s.end?(m>=s.start&&m<s.end):(m>=s.start||m<s.end);if(!inside)return;var key=dateKey+'|'+si;if(!groups[key])groups[key]={date:dateKey,si:si,bets:0,wins:0,losses:0,netPL:0};groups[key].bets++;if(r.outcome==='win')groups[key].wins++;else groups[key].losses++;groups[key].netPL+=r.netPL;});});
+  var rows=Object.values(groups).sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:a.si-b.si;});
+  if(!rows.length){wrap.innerHTML='<div style="font-size:12px;color:var(--fg3);padding:6px 0">No bets in defined session windows. Adjust session times or import more data.</div>';return;}
+  var tB=0,tW=0,tL=0,tPL=0;rows.forEach(function(r){tB+=r.bets;tW+=r.wins;tL+=r.losses;tPL+=r.netPL;});
+  function si(l,v,c){return'<div class="ss-item"><div class="ss-lbl">'+l+'</div><div class="ss-val'+(c?' '+c:'')+'">'+v+'</div></div>';}
+  var sumHtml='<div class="sess-sum">'+si('Session Bets',tB,'')+si('Wins',tW,'pos')+si('Losses',tL,'neg')+si('Net P/L',fINR(tPL),tPL>=0?'pos':'neg')+si('Win Rate',fPct(tB>0?tW/tB:0),tB>0&&tW/tB>=0.5?'pos':'neg')+'</div>';
+  var cumPL=0;
+  var tRows=rows.map(function(r){cumPL+=r.netPL;var s=APP.sessions[r.si],plC=r.netPL>0?'var(--pos)':r.netPL<0?'var(--neg)':'inherit',cumC=cumPL>0?'var(--pos)':cumPL<0?'var(--neg)':'inherit';var wr=r.bets>0?fPct(r.wins/r.bets):'—';return'<tr><td><strong>'+fDateDisp(r.date)+'</strong></td><td>'+fTimeMin(s.start)+' – '+fTimeMin(s.end)+'</td><td>'+r.bets+'</td><td style="color:var(--pos)">'+r.wins+'</td><td style="color:var(--neg)">'+r.losses+'</td><td>'+wr+'</td><td style="color:'+plC+'">'+fINR(r.netPL)+'</td><td style="color:'+cumC+'">'+fINR(cumPL)+'</td></tr>';}).join('');
+  wrap.innerHTML=sumHtml+'<div class="spl-scroll"><table class="spl-table"><thead><tr><th>Date</th><th>Session (IST)</th><th>Bets</th><th>Wins</th><th>Losses</th><th>Win%</th><th>Net P/L</th><th>Cum P/L</th></tr></thead><tbody>'+tRows+'</tbody><tfoot><tr><td colspan="2">Total ('+rows.length+' session'+(rows.length!==1?'s':'')+')</td><td>'+tB+'</td><td style="color:var(--pos)">'+tW+'</td><td style="color:var(--neg)">'+tL+'</td><td>'+fPct(tB>0?tW/tB:0)+'</td><td style="color:'+(tPL>=0?'var(--pos)':'var(--neg)')+'">'+fINR(tPL)+'</td><td style="color:'+(tPL>=0?'var(--pos)':'var(--neg)')+'">'+fINR(tPL)+'</td></tr></tfoot></table></div>';
+}
+
+/* ── ROUND TABLE ── */
+function renderTable(rounds,limit){
+  var total=rounds.length,shown=Math.min(limit||APP.rowLimit,total),slice=rounds.slice(Math.max(0,total-shown)).reverse();
+  if(!slice.length){document.getElementById('tbody').innerHTML='<tr><td colspan="9" class="empty">No rounds in window.</td></tr>';document.getElementById('tblInfo').textContent='—';return;}
+  var rows=slice.map(function(r,i){
+    var rowCls=r.action==='BET_WIN'?'rwin':r.action==='BET_LOSS'?'rloss':r.action==='SIGNAL'?'rsig':r.action==='COOLDOWN_WAIT'?'rcd':'';
+    var resBdg=r.isLeaf?'<span class="bdg bdg-leaf">Leaf</span>':'<span class="bdg bdg-other">'+escH(r.result)+'</span>';
+    var actBdg=r.action==='WAIT_NON_LEAF'?'<span class="bdg bdg-wait">Wait</span>':r.action==='SIGNAL'?'<span class="bdg bdg-sig">Signal</span>':r.action==='BET_WIN'?'<span class="bdg bdg-win">Win ₹'+r.stake+'</span>':r.action==='BET_LOSS'?'<span class="bdg bdg-loss">Loss ₹'+r.stake+'</span>':r.action==='COOLDOWN_WAIT'?'<span class="bdg bdg-cool">Cooldown</span>':'';
+    var plStyle=r.netPL>0?'color:var(--pos)':r.netPL<0?'color:var(--neg)':'',cumStyle=r.cumulativePL>0?'color:var(--pos)':r.cumulativePL<0?'color:var(--neg)':'';
+    var idx=total-shown+slice.length-1-i+1;
+    return'<tr class="'+rowCls+'"><td style="color:var(--fg3)">'+idx+'</td><td>'+fISTShort(r.timestamp)+' <span style="font-size:10px;color:var(--fg3)">'+fISTDate(r.timestamp)+'</span></td><td>'+resBdg+'</td><td>'+actBdg+'</td><td>'+(r.betPlaced?'₹'+r.stake:'—')+'</td><td style="'+plStyle+'">'+(r.netPL!==0?fINR(r.netPL):'—')+'</td><td style="'+cumStyle+'">'+fINR(r.cumulativePL)+'</td><td>₹'+Math.round(r.bankroll).toLocaleString('en-IN')+'</td><td>₹'+r.nextStake+'</td></tr>';
+  });
+  document.getElementById('tbody').innerHTML=rows.join('');
+  document.getElementById('tblInfo').textContent='Showing '+shown+' of '+total+' rounds (IST, recent first)';
+  document.getElementById('tblCount').textContent=total+' rounds';
+  document.getElementById('showMoreBtn').style.display=shown>=total?'none':'';
+  document.getElementById('expRoundsBtn').style.display='';
+}
+
+/* ── MAIN RUN ── */
+function runAndRender(){
+  if(!APP.raw.length)return;
+  var win=document.getElementById('winSel').value,sb=Math.max(100,parseInt(document.getElementById('bankIn').value)||10000);
+  var pm=parseFloat(document.getElementById('payoutSel').value)||1,cd=parseInt(document.getElementById('cooldownSel').value)||0;
+  var filtered=filterByWindow(APP.raw,win);
+  document.getElementById('winWarn').style.display=(win==='all'||!filtered.length)?'none':'';
+  var result=runBacktest(filtered,{startingBankroll:sb,payoutMultiplier:pm,cooldownMinutes:cd});
+  APP.result=result;renderStats(result.summary,sb);renderCharts(result.rounds);renderTimeAnalysis(result.rounds);renderSessionPL(result.rounds);renderTable(result.rounds,APP.rowLimit);
+  document.getElementById('expRoundsBtn').style.display='';document.getElementById('expStrip').style.display='';
+  saveSettings();
+}
+function loadRecords(recs,srcName){if(!recs.length){setStatus('err','No valid records');return;}APP.raw=recs;APP.src.name=srcName;setStatus('ok',srcName,recs.length+' rounds');document.getElementById('noDataBanner').style.display='none';document.getElementById('clearBtn').style.display='';document.getElementById('expStrip').style.display='';runAndRender();}
+function showErr(msg,warn){var el=document.getElementById('fetchErr'),et=document.getElementById('fetchErrTxt');el.className='alert '+(warn?'alert-warn':'alert-err');et.textContent=msg;el.style.display='';}
+function hideErr(){document.getElementById('fetchErr').style.display='none';}
+function handleFile(file){if(!file)return;var reader=new FileReader();reader.onload=function(e){var text=e.target.result,parsed;if(file.name.endsWith('.json')){parsed=parseJSONData(text);}else{parsed=parseCSV(text);if(!parsed.records.length&&parsed.errors.length){var jp=parseJSONData(text);if(jp.records.length>0)parsed=jp;}}if(!parsed.records.length){showErr('Import failed: '+(parsed.errors.join('; ')||'No valid records'));return;}hideErr();if(parsed.errors.length)showErr('Imported '+parsed.records.length+' records; '+parsed.errors.length+' rows skipped: '+parsed.errors.slice(0,3).join('; '),true);loadRecords(parsed.records,file.name);};reader.readAsText(file);}
+async function attemptFetch(){var btn=document.getElementById('fetchBtn');btn.disabled=true;btn.textContent='Fetching…';setStatus('busy','Attempting…');hideErr();var urls=['https://casinodrop.com/wp-json/casinodrop/v1/lightningstorm/history','https://casinodrop.com/wp-json/casinodrop/v1/tracker/lightningstorm'];var ok=false;for(var i=0;i<urls.length;i++){try{var res=await fetch(urls[i]);if(!res.ok)continue;var data=await res.json();var p=parseJSONData(JSON.stringify(data));if(p.records.length>0){loadRecords(p.records,'CasinoDrop (live)');ok=true;break;}}catch(e){}}btn.disabled=false;btn.textContent='蘵 Fetch';if(!ok){if(APP.raw.length)setStatus('ok',APP.src.name,APP.raw.length+' rounds');else setStatus('err','Fetch failed');showErr('Live fetch blocked by CORS. Export CSV from casinodrop.com and use 虹 CSV.');}}
+function exportCSV(){if(!APP.result)return;var hdrs=['#','UTC','IST','Result','Action','BetPlaced','Stake','Outcome','NetPL','CumPL','Bankroll','NextStake','InCooldown'];var rows=APP.result.rounds.map(function(r,i){return[i+1,r.timestamp,fISTShort(r.timestamp),r.result,r.action,r.betPlaced,r.stake,r.outcome||'',r.netPL,r.cumulativePL,Math.round(r.bankroll),r.nextStake,r.inCooldown];});var csv=[hdrs].concat(rows).map(function(r){return r.map(function(v){return'"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n');var blob=new Blob([csv],{type:'text/csv'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='ls_backtest.csv';a.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);}
+function exportJSON(){if(!APP.raw.length)return;var blob=new Blob([JSON.stringify(APP.raw,null,2)],{type:'application/json'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='ls_normalized.json';a.click();setTimeout(function(){URL.revokeObjectURL(url);},1000);}
+
+/* ── INSTALL ── */
+var deferredInstall=null;
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferredInstall=e;var btn=document.getElementById('installBtn');btn.style.display='';btn.addEventListener('click',function(){if(deferredInstall){deferredInstall.prompt();deferredInstall.userChoice.then(function(){deferredInstall=null;btn.style.display='none';});}});});
+function showInstallGuide(){document.getElementById('installGuideCard').style.display='';document.getElementById('installGuideCard').scrollIntoView({behavior:'smooth',block:'start'});}
+function checkInstallBanner(){try{var dismissed=localStorage.getItem('ls_ib_dismissed');if(dismissed)return;var isMobile=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);if(isMobile)document.getElementById('installBanner').style.display='';}catch(e){}}
+document.getElementById('dismissBanner').addEventListener('click',function(){document.getElementById('installBanner').style.display='none';try{localStorage.setItem('ls_ib_dismissed','1');}catch(e){}});
+document.getElementById('closeGuideBtn').addEventListener('click',function(){document.getElementById('installGuideCard').style.display='none';});
+
+/* ── TESTS ── */
+function renderTests(){var results=runTests(),pass=results.filter(function(r){return r.passed;}).length;document.getElementById('testSum').textContent=pass+'/'+results.length+' passing';document.getElementById('tgrid').innerHTML=results.map(function(r){return'<div class="trow '+(r.passed?'tpass':'tfail')+'"><span class="tic">'+(r.passed?'✓':'✗')+'</span><div><div class="tname">'+r.id+'. '+escH(r.name)+'</div><div class="tdetail">'+escH(r.detail)+'</div></div></div>';}).join('');if(results.some(function(r){return!r.passed;}))document.getElementById('testsCard').open=true;}
+
+/* ── THEME ── */
+var theme='system';
+function setTheme(t){theme=t;var root=document.documentElement;if(t==='dark')root.setAttribute('data-theme','dark');else if(t==='light')root.setAttribute('data-theme','light');else root.removeAttribute('data-theme');document.getElementById('themeBtn').textContent=t==='dark'?'Dark':t==='light'?'Light':'Auto';try{localStorage.setItem('ls_theme',t);}catch(e){}if(APP.result)renderCharts(APP.result.rounds);}
+try{var st=localStorage.getItem('ls_theme');if(st)setTheme(st);}catch(e){}
+document.getElementById('themeBtn').addEventListener('click',function(){setTheme(theme==='system'?'dark':theme==='dark'?'light':'system');});
+
+/* ── EVENT WIRING ── */
+document.getElementById('fetchBtn').addEventListener('click',attemptFetch);
+document.getElementById('clearBtn').addEventListener('click',function(){APP.raw=[];APP.result=null;setStatus('','No data loaded');document.getElementById('noDataBanner').style.display='';document.getElementById('clearBtn').style.display='none';document.getElementById('expStrip').style.display='none';document.getElementById('fetchErr').style.display='none';document.getElementById('timeCard').style.display='none';document.getElementById('sgrid').innerHTML='<div class="empty">Load data and run backtest to see results.</div>';document.getElementById('tbody').innerHTML='<tr><td colspan="9" class="empty">No data loaded.</td></tr>';document.getElementById('tblInfo').textContent='—';document.getElementById('tblCount').textContent='';document.getElementById('showMoreBtn').style.display='none';document.getElementById('expRoundsBtn').style.display='none';document.getElementById('sessPlWrap').innerHTML='';if(bCI){bCI.destroy();bCI=null;}if(plCI){plCI.destroy();plCI=null;}});
+document.getElementById('runBtn').addEventListener('click',runAndRender);
+document.getElementById('fabRun').addEventListener('click',runAndRender);
+document.getElementById('csvIn').addEventListener('change',function(e){handleFile(e.target.files[0]);this.value='';});
+document.getElementById('jsonIn').addEventListener('change',function(e){handleFile(e.target.files[0]);this.value='';});
+document.getElementById('showMoreBtn').addEventListener('click',function(){APP.rowLimit+=100;if(APP.result)renderTable(APP.result.rounds,APP.rowLimit);});
+document.getElementById('expRoundsBtn').addEventListener('click',exportCSV);
+document.getElementById('expNormBtn').addEventListener('click',exportJSON);
+document.getElementById('expBackBtn').addEventListener('click',exportCSV);
+document.getElementById('addSessBtn').addEventListener('click',function(){APP.sessions.push({start:0,end:120});renderSessionList();saveSettings();});
+['winSel','bankIn','payoutSel','cooldownSel'].forEach(function(id){document.getElementById(id).addEventListener('change',function(){saveSettings();if(APP.raw.length)runAndRender();});});
+var dz=document.getElementById('dropZone');
+dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('drag');});
+dz.addEventListener('dragleave',function(){dz.classList.remove('drag');});
+dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('drag');var f=e.dataTransfer.files[0];if(f)handleFile(f);});
+window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change',function(){if(theme==='system'&&APP.result)renderCharts(APP.result.rounds);});
+
+/* ── INIT ── */
+loadSettings();
+renderSessionList();
+checkInstallBanner();
+renderTests();
+</script>
+</body>
+</html>
