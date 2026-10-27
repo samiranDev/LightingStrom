@@ -293,6 +293,7 @@ details.tests-card[open] summary::after{content:"\2212"}
     <div style="display:flex;gap:8px;padding:10px 16px 0">
       <button class="strat-tab active" id="s1Tab">S1: Leaf</button>
       <button class="strat-tab" id="s2Tab">S2: Continuous</button>
+      <button class="strat-tab" id="s3Tab">S3: Rev Martingale</button>
     </div>
     <div class="ctrls">
       <div class="cg"><label>Time Window</label><select class="cs" id="winSel"><option value="1h">Last 1 hour</option><option value="6h">Last 6 hours</option><option value="12h">Last 12 hours</option><option value="24h">Last 24 hours</option><option value="3d">Last 3 days</option><option value="7d">Last 7 days</option><option value="all" selected>All available</option></select></div>
@@ -302,6 +303,7 @@ details.tests-card[open] summary::after{content:"\2212"}
     </div>
     <div class="pnote" id="s1Note">S1: Wait for Leaf signal → bet Leaf every round. After ₹100+₹200+₹400 loss cycle, cooldown pauses betting. Settings auto-saved.</div>
     <div class="pnote" id="s2Note" style="display:none">S2: Follow last result — Leaf→bet Leaf (₹100), Number→bet all 20 numbers (₹5×20). Same Martingale cycle. Uses CSV payout for number wins.</div>
+    <div class="pnote" id="s3Note" style="display:none">S3: Reverse Martingale — Win doubles the stake (₹100→₹200→₹400 then back to ₹100). Any Loss resets immediately to ₹100 and waits for next Leaf signal. Cooldown triggers after each loss (optional).</div>
   </div>
 
   <div class="card"><div class="sec-label">Summary</div><div class="sgrid" id="sgrid"><div class="empty">Load data and run backtest to see results.</div></div></div>
@@ -448,6 +450,30 @@ function runBacktest2(recs,opts){
   return{rounds:rounds,summary:{totalRounds:norm.length,totalBets:totBets,wins:wins,losses:losses,winRate:totBets>0?wins/totBets:0,totalWagered:wagered,netPL:cumPL,finalBankroll:bank,maxDrawdown:maxDD,longestWinStreak:longestWin,longestLosingStreak:longestLoss,currentProgressionLevel:lv,currentStake:lastLeaf?stakeFor(lv):stakePerNum(lv)*20,cooldownPeriods:cdPeriods,cooldownRounds:cdRounds,nextBetType:lastLeaf===null?null:lastLeaf?'leaf':'numbers'}};
 }
 
+/* ── STRATEGY 3 ENGINE (Reverse Martingale) ── */
+function runBacktest3(recs,opts){
+  var o=opts||{},sb=o.startingBankroll!==undefined?o.startingBankroll:10000,pm=o.payoutMultiplier!==undefined?o.payoutMultiplier:1,cdMs=(o.cooldownMinutes||0)*60000;
+  var norm=normalizeRecords(recs),state='WAITING_FOR_LEAF',lv=1,bank=sb,cumPL=0,peak=sb,maxDD=0;
+  var totBets=0,wins=0,losses=0,wagered=0,signals=0,streaks=0,curBets=0,longestStr=0,strLens=[];
+  var curLoss=0,longestLoss=0,cdPeriods=0,cdRounds=0,cooldownUntil=null,rounds=[];
+  for(var i=0;i<norm.length;i++){
+    var rec=norm[i],recMs=new Date(rec.timestamp).getTime(),leaf=isLeaf(rec.result);
+    if(state==='COOLDOWN'&&cdMs>0&&cooldownUntil!==null&&recMs>=cooldownUntil){state='WAITING_FOR_LEAF';cooldownUntil=null;}
+    var action,bet=false,stake=0,outcome=null,net=0;
+    if(state==='COOLDOWN'){action='COOLDOWN_WAIT';cdRounds++;}
+    else if(state==='WAITING_FOR_LEAF'){if(!leaf){action='WAIT_NON_LEAF';}else{action='SIGNAL';state='LEAF_STREAK_ACTIVE';signals++;streaks++;curBets=0;lv=1;}}
+    else{bet=true;stake=stakeFor(lv);wagered+=stake;totBets++;
+      if(leaf){action='BET_WIN';outcome='win';net=stake*pm;wins++;curBets++;curLoss=0;lv=nextLv(lv);}
+      else{action='BET_LOSS';outcome='loss';net=-stake;losses++;curLoss++;if(curLoss>longestLoss)longestLoss=curLoss;if(curBets>longestStr)longestStr=curBets;strLens.push(curBets);curBets=0;lv=1;
+        if(cdMs>0){state='COOLDOWN';cooldownUntil=recMs+cdMs;cdPeriods++;}else{state='WAITING_FOR_LEAF';}}}
+    cumPL+=net;bank+=net;if(bank>peak)peak=bank;var dd=peak-bank;if(dd>maxDD)maxDD=dd;
+    rounds.push({roundId:rec.roundId!=null?rec.roundId:null,timestamp:rec.timestamp,result:rec.result,isLeaf:leaf,action:action,betPlaced:bet,stake:stake,outcome:outcome,netPL:net,cumulativePL:cumPL,bankroll:bank,progressionLevel:lv,nextStake:stakeFor(lv),streakActiveAfter:state==='LEAF_STREAK_ACTIVE',inCooldown:state==='COOLDOWN',cooldownUntil:cooldownUntil?new Date(cooldownUntil).toISOString():null});
+  }
+  if(state==='LEAF_STREAK_ACTIVE'&&curBets>0){if(curBets>longestStr)longestStr=curBets;strLens.push(curBets);}
+  var avgStr=strLens.length>0?strLens.reduce(function(a,b){return a+b;},0)/strLens.length:0;
+  return{rounds:rounds,summary:{totalRounds:norm.length,totalBets:totBets,wins:wins,losses:losses,winRate:totBets>0?wins/totBets:0,totalWagered:wagered,netPL:cumPL,finalBankroll:bank,leafSignals:signals,leafStreaks:streaks,avgStreakLength:avgStr,longestStreak:longestStr,maxDrawdown:maxDD,longestLosingStreak:longestLoss,currentStake:stakeFor(lv),currentProgressionLevel:lv,cooldownPeriods:cdPeriods,cooldownRounds:cdRounds}};
+}
+
 /* ── TESTS ── */
 function mkR(results,baseMs){var base=baseMs||new Date('2026-01-01T00:00:00Z').getTime();return results.map(function(r,i){return{result:r,timestamp:new Date(base+i*60000).toISOString(),roundId:'r'+i};});}
 function mkR2(items,baseMs){var base=baseMs||new Date('2026-01-01T00:00:00Z').getTime();return items.map(function(item,i){var result=typeof item==='string'?item:item.result;var payout=typeof item==='string'?0:(item.payout||0);return{result:result,timestamp:new Date(base+i*60000).toISOString(),roundId:'r2_'+i,payout:payout,number:null};});}
@@ -501,6 +527,14 @@ function runTests(){
     // R0:Skip R1:bet-leaf-L1 Leaf→WIN lv1 R2:bet-leaf-L1 non-leaf→LOSS lv2
     return{passed:r.summary.totalBets===2&&r.summary.wins===1&&r.summary.losses===1,detail:'W='+r.summary.wins+' L='+r.summary.losses};});
   test(40,'S2: nextBetType follows last result',function(){var r=runBacktest2(mkR2(['Leaf','Leaf']));return{passed:r.summary.nextBetType==='leaf',detail:'nbt='+r.summary.nextBetType};});
+  // ── S3 tests ──
+  test(41,'S3: first Leaf → signal only, no bet',function(){var r=runBacktest3(mkR(['Number','Leaf']));var rd=r.rounds[1];return{passed:rd.action==='SIGNAL'&&!rd.betPlaced&&r.summary.totalBets===0,detail:'action='+rd.action};});
+  test(42,'S3: signal then Leaf win → ₹100 bet, next stake ₹200',function(){var r=runBacktest3(mkR(['Number','Leaf','Leaf']));var rd=r.rounds[2];return{passed:rd.action==='BET_WIN'&&rd.stake===100&&rd.nextStake===200,detail:'next='+rd.nextStake};});
+  test(43,'S3: two wins → ₹200 bet, next stake ₹400',function(){var r=runBacktest3(mkR(['Number','Leaf','Leaf','Leaf']));var rd=r.rounds[3];return{passed:rd.action==='BET_WIN'&&rd.stake===200&&rd.nextStake===400,detail:'stake='+rd.stake};});
+  test(44,'S3: three wins → ₹400 bet resets to ₹100',function(){var r=runBacktest3(mkR(['Number','Leaf','Leaf','Leaf','Leaf']));var rd=r.rounds[4];return{passed:rd.action==='BET_WIN'&&rd.stake===400&&rd.nextStake===100,detail:'next='+rd.nextStake};});
+  test(45,'S3: loss at ₹100 → reset to ₹100, exit streak',function(){var r=runBacktest3(mkR(['Leaf','Leaf','Number']));var rd=r.rounds[2];return{passed:rd.action==='BET_LOSS'&&rd.stake===100&&rd.nextStake===100&&!rd.streakActiveAfter,detail:'streakActive='+rd.streakActiveAfter};});
+  test(46,'S3: loss at ₹200 → reset to ₹100',function(){var r=runBacktest3(mkR(['Number','Leaf','Leaf','Number']));var rd=r.rounds[3];return{passed:rd.action==='BET_LOSS'&&rd.stake===200&&rd.nextStake===100,detail:'next='+rd.nextStake};});
+  test(47,'S3: any loss triggers cooldown',function(){var r=runBacktest3(mkR(['Leaf','Leaf','Number']),{cooldownMinutes:30});var rd=r.rounds[2];return{passed:rd.action==='BET_LOSS'&&rd.inCooldown,detail:'cd='+rd.inCooldown};});
   return out;
 }
 
@@ -571,7 +605,7 @@ function loadSettings(){
       if(c.bank)document.getElementById('bankIn').value=c.bank;
       if(c.pay)document.getElementById('payoutSel').value=c.pay;
       if(c.cd)document.getElementById('cooldownSel').value=c.cd;
-      if(c.strat&&(c.strat===1||c.strat===2)){APP.strategy=c.strat;setStrategyUI(c.strat);}
+      if(c.strat&&(c.strat===1||c.strat===2||c.strat===3)){APP.strategy=c.strat;setStrategyUI(c.strat);}
     }
   }catch(e){}
 }
@@ -596,6 +630,21 @@ function renderStats(s,sb,str){
       {l:'Total Rounds',v:fNum(s.totalRounds,0),sub:'in window'},
       {l:'Next Bet Stake',v:'₹'+s.currentStake,sub:'level '+s.currentProgressionLevel},
       {l:'3-Loss Cycles',v:fNum(s.cooldownPeriods,0),cls:s.cooldownPeriods>0?'warn':'',sub:s.cooldownPeriods>0?'cooldown triggered':'none',sc:s.cooldownPeriods>0?'warn':''},
+      {l:'Rounds in Cooldown',v:fNum(s.cooldownRounds,0),sub:s.cooldownRounds>0?'rounds skipped':'none'},
+    ];
+  }else if(str===3){
+    cards=[
+      {l:'Net P/L',v:fINR(s.netPL),cls:s.netPL>=0?'pos':'neg',sub:'from ₹'+sb.toLocaleString('en-IN'),sc:s.netPL>=0?'pos':'neg'},
+      {l:'Current Bankroll',v:fINR(s.finalBankroll),cls:s.netPL>=0?'pos':'neg',sc:s.netPL>=0?'pos':'neg'},
+      {l:'Win Rate',v:fPct(s.winRate),cls:s.winRate>=0.5?'pos':'neg',sub:s.wins+'W / '+s.losses+'L',sc:s.winRate>=0.5?'pos':'neg'},
+      {l:'Total Wagered',v:fINR(s.totalWagered),sub:s.totalBets+' bets'},
+      {l:'Leaf Signals',v:fNum(s.leafSignals,0),sub:s.leafStreaks+' streaks'},
+      {l:'Longest Win Chain',v:fNum(s.longestStreak,0)+' wins',sub:'avg '+fNum(s.avgStreakLength)},
+      {l:'Max Drawdown',v:fINR(s.maxDrawdown),cls:'neg',sc:'neg'},
+      {l:'Longest Loss Run',v:fNum(s.longestLosingStreak,0)+' losses'},
+      {l:'Total Rounds',v:fNum(s.totalRounds,0),sub:'in window'},
+      {l:'Next Bet Stake',v:'₹'+s.currentStake,sub:'level '+s.currentProgressionLevel},
+      {l:'Loss Cooldowns',v:fNum(s.cooldownPeriods,0),cls:s.cooldownPeriods>0?'warn':'',sub:s.cooldownPeriods>0?'cooldown triggered':'none',sc:s.cooldownPeriods>0?'warn':''},
       {l:'Rounds in Cooldown',v:fNum(s.cooldownRounds,0),sub:s.cooldownRounds>0?'rounds skipped':'none'},
     ];
   }else{
@@ -706,8 +755,10 @@ function setStrategyUI(s){
   APP.strategy=s;
   document.getElementById('s1Tab').className='strat-tab'+(s===1?' active':'');
   document.getElementById('s2Tab').className='strat-tab'+(s===2?' active':'');
+  document.getElementById('s3Tab').className='strat-tab'+(s===3?' active':'');
   document.getElementById('s1Note').style.display=s===1?'':'none';
   document.getElementById('s2Note').style.display=s===2?'':'none';
+  document.getElementById('s3Note').style.display=s===3?'':'none';
   document.getElementById('payoutSel').parentElement.style.display=s===2?'none':'';
 }
 
@@ -718,7 +769,7 @@ function runAndRender(){
   var pm=parseFloat(document.getElementById('payoutSel').value)||1,cd=parseInt(document.getElementById('cooldownSel').value)||0;
   var filtered=filterByWindow(APP.raw,win);
   document.getElementById('winWarn').style.display=(win==='all'||!filtered.length)?'none':'';
-  var result=APP.strategy===2?runBacktest2(filtered,{startingBankroll:sb,cooldownMinutes:cd}):runBacktest(filtered,{startingBankroll:sb,payoutMultiplier:pm,cooldownMinutes:cd});
+  var result=APP.strategy===2?runBacktest2(filtered,{startingBankroll:sb,cooldownMinutes:cd}):APP.strategy===3?runBacktest3(filtered,{startingBankroll:sb,payoutMultiplier:pm,cooldownMinutes:cd}):runBacktest(filtered,{startingBankroll:sb,payoutMultiplier:pm,cooldownMinutes:cd});
   APP.result=result;renderStats(result.summary,sb,APP.strategy);renderCharts(result.rounds);renderTimeAnalysis(result.rounds);renderSessionPL(result.rounds);renderTable(result.rounds,APP.rowLimit);
   document.getElementById('expRoundsBtn').style.display='';document.getElementById('expStrip').style.display='';
   saveSettings();
@@ -755,6 +806,7 @@ document.getElementById('runBtn').addEventListener('click',runAndRender);
 document.getElementById('fabRun').addEventListener('click',runAndRender);
 document.getElementById('s1Tab').addEventListener('click',function(){setStrategyUI(1);saveSettings();if(APP.raw.length)runAndRender();});
 document.getElementById('s2Tab').addEventListener('click',function(){setStrategyUI(2);saveSettings();if(APP.raw.length)runAndRender();});
+document.getElementById('s3Tab').addEventListener('click',function(){setStrategyUI(3);saveSettings();if(APP.raw.length)runAndRender();});
 document.getElementById('csvIn').addEventListener('change',function(e){handleFile(e.target.files[0]);this.value='';});
 document.getElementById('jsonIn').addEventListener('change',function(e){handleFile(e.target.files[0]);this.value='';});
 document.getElementById('showMoreBtn').addEventListener('click',function(){APP.rowLimit+=100;if(APP.result)renderTable(APP.result.rounds,APP.rowLimit);});
